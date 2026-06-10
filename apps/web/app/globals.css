@@ -1,0 +1,189 @@
+@import "tailwindcss";
+
+/* ===== Nusantara Retail System — design tokens ===== */
+@theme inline {
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+
+  /* Core palette */
+  --color-background: #f5fbf5;
+  --color-surface: #f5fbf5;
+  --color-surface-muted: #f8fafc;
+  --color-surface-container: #e9efe9;
+  --color-surface-container-low: #eff5ef;
+  --color-card: #ffffff;
+
+  --color-on-surface: #171d19;
+  --color-on-surface-variant: #3d4a42;
+  --color-outline: #6d7a72;
+  --color-outline-variant: #bccac0;
+
+  /* Brand */
+  --color-primary: #006948;
+  --color-primary-container: #00855d;
+  --color-on-primary: #ffffff;
+  --color-primary-fixed: #85f8c4;
+  --color-on-primary-fixed: #002114;
+  --color-inverse-primary: #68dba9;
+
+  --color-secondary: #006398;
+  --color-secondary-container: #5bb8fe;
+  --color-on-secondary-container: #00476e;
+  --color-secondary-fixed: #cce5ff;
+
+  /* Semantic */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-error: #ba1a1a;
+  --color-debt: #7c3aed;
+}
+
+:root {
+  --background: #f5fbf5;
+  --foreground: #171d19;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Monospace for figures, SKUs, prices */
+.font-mono,
+.tabular {
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+/* Small caps label (JetBrains Mono) */
+.label-caps {
+  font-family: var(--font-jetbrains), ui-monospace, monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #3d4a42;
+}
+
+/* ===== Form inputs ===== */
+.input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid #bccac0;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.9375rem;
+  color: #171d19;
+  background: #ffffff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input::placeholder {
+  color: #6d7a72;
+}
+.input:focus {
+  outline: none;
+  border-color: #006948;
+  box-shadow: 0 0 0 3px rgba(0, 105, 72, 0.15);
+}
+
+.label {
+  display: block;
+  margin-bottom: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #3d4a42;
+}
+
+/* ===== Buttons (min 44px touch target) ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  border-radius: 0.75rem;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  transition: background-color 0.15s, opacity 0.15s, border-color 0.15s;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: #006948;
+  color: #ffffff;
+}
+.btn-primary:hover:not(:disabled) {
+  background: #00553b;
+}
+.btn-secondary {
+  background: #ffffff;
+  color: #006948;
+  border: 2px solid #006948;
+}
+.btn-secondary:hover:not(:disabled) {
+  background: #eff5ef;
+}
+.btn-info {
+  background: #006398;
+  color: #ffffff;
+}
+.btn-info:hover:not(:disabled) {
+  background: #00558a;
+}
+.btn-danger {
+  background: #ef4444;
+  color: #ffffff;
+}
+.btn-danger:hover:not(:disabled) {
+  background: #dc2626;
+}
+.btn-ghost {
+  background: #ffffff;
+  color: #3d4a42;
+  border: 1px solid #bccac0;
+}
+.btn-ghost:hover:not(:disabled) {
+  background: #eff5ef;
+}
+
+/* ===== Cards ===== */
+.card {
+  border-radius: 1rem;
+  background: #ffffff;
+  border: 1px solid #bccac0;
+}
+
+/* Status pill */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  padding: 0.1875rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+/* ===== Print: show only the receipt ===== */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #receipt,
+  #receipt * {
+    visibility: visible;
+  }
+  #receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}
