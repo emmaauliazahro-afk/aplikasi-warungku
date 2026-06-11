@@ -1,4 +1,6 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api';
+import { getApiBaseUrl } from './base-url';
+
+const API_URL = getApiBaseUrl();
 
 export interface ApiResponse<T> {
   success: boolean;
