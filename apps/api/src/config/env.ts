@@ -8,11 +8,14 @@ function required(key: string, fallback?: string): string {
   return value;
 }
 
+const nodeEnv = process.env.NODE_ENV ?? 'development';
+
 export const env = {
   port: Number(process.env.PORT ?? 5000),
   databaseUrl: required('DATABASE_URL'),
-  jwtSecret: required('JWT_SECRET', 'dev-secret-change-me'),
+  jwtSecret: required('JWT_SECRET'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '7d',
-  nodeEnv: process.env.NODE_ENV ?? 'development',
-  isProduction: (process.env.NODE_ENV ?? 'development') === 'production',
+  nodeEnv,
+  isProduction: nodeEnv === 'production',
+  webOrigin: nodeEnv === 'production' ? required('WEB_ORIGIN') : required('WEB_ORIGIN', 'http://localhost:3000'),
 };

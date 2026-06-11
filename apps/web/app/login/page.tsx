@@ -4,6 +4,8 @@ import { useState, FormEvent } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ApiError } from '@/lib/api';
 
+const showDemoCredentials = process.env.NODE_ENV !== 'production';
+
 export default function LoginPage() {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
@@ -75,9 +77,11 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-xs text-on-surface-variant">
-            Demo: owner@warung.test / password123
-          </p>
+          {showDemoCredentials && (
+            <p className="mt-6 text-center text-xs text-on-surface-variant">
+              Demo: owner@warung.test / password123
+            </p>
+          )}
         </div>
       </div>
     </div>

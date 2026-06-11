@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/error';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
 import { uploadCsv } from '../middleware/upload';
 import {
   listProducts,
@@ -20,16 +20,16 @@ router.use(authenticate);
 
 // Import routes MUST be defined before '/:id' to avoid being captured by it
 router.get('/import/template', downloadTemplate);
-router.post('/import', uploadCsv, asyncHandler(importProducts));
+router.post('/import', authorize('OWNER'), uploadCsv, asyncHandler(importProducts));
 
 router.get('/', asyncHandler(listProducts));
 router.get('/:id', asyncHandler(getProduct));
-router.post('/', asyncHandler(createProduct));
-router.put('/:id', asyncHandler(updateProduct));
-router.delete('/:id', asyncHandler(deleteProduct));
+router.post('/', authorize('OWNER'), asyncHandler(createProduct));
+router.put('/:id', authorize('OWNER'), asyncHandler(updateProduct));
+router.delete('/:id', authorize('OWNER'), asyncHandler(deleteProduct));
 
 // Stock management
 router.get('/:id/movements', asyncHandler(getStockMovements));
-router.post('/:id/adjust-stock', asyncHandler(adjustStock));
+router.post('/:id/adjust-stock', authorize('OWNER'), asyncHandler(adjustStock));
 
 export default router;

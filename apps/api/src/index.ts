@@ -1,6 +1,7 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { env } from './config/env';
 import { errorHandler, notFoundHandler } from './middleware/error';
 import authRoutes from './routes/auth.routes';
@@ -15,9 +16,10 @@ import reportRoutes from './routes/report.routes';
 const app: Application = express();
 
 // Middleware
+app.use(helmet());
 app.use(
   cors({
-    origin: process.env.WEB_ORIGIN ?? 'http://localhost:3000',
+    origin: env.webOrigin,
     credentials: true,
   })
 );

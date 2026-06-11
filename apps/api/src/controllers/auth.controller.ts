@@ -3,7 +3,7 @@ import prisma from '../lib/prisma';
 import { hashPassword, comparePassword } from '../lib/password';
 import { signToken } from '../lib/jwt';
 import { ApiError } from '../middleware/error';
-import { registerSchema, loginSchema } from '../schemas/auth.schema';
+import { createCashierSchema, registerSchema, loginSchema } from '../schemas/auth.schema';
 import { env } from '../config/env';
 
 const COOKIE_NAME = 'token';
@@ -21,6 +21,11 @@ function setAuthCookie(res: Response, token: string) {
 export async function register(req: Request, res: Response) {
   const data = registerSchema.parse(req.body);
 
+  const userCount = await prisma.user.count();
+  if (userCount > 0) {
+    throw new ApiError(403, 'Registrasi owner hanya tersedia saat setup awal.');
+  }
+
   const existing = await prisma.user.findUnique({
     where: { email: data.email },
   });
@@ -33,7 +38,7 @@ export async function register(req: Request, res: Response) {
       name: data.name,
       email: data.email,
       password: await hashPassword(data.password),
-      role: data.role ?? 'OWNER',
+      role: 'OWNER',
     },
     select: { id: true, name: true, email: true, role: true },
   });
@@ -42,6 +47,29 @@ export async function register(req: Request, res: Response) {
   setAuthCookie(res, token);
 
   res.status(201).json({ success: true, data: { user, token } });
+}
+
+export async function createCashier(req: Request, res: Response) {
+  const data = createCashierSchema.parse(req.body);
+
+  const existing = await prisma.user.findUnique({
+    where: { email: data.email },
+  });
+  if (existing) {
+    throw new ApiError(409, 'Email sudah terdaftar');
+  }
+
+  const user = await prisma.user.create({
+    data: {
+      name: data.name,
+      email: data.email,
+      password: await hashPassword(data.password),
+      role: 'CASHIER',
+    },
+    select: { id: true, name: true, email: true, role: true, createdAt: true },
+  });
+
+  res.status(201).json({ success: true, data: { user } });
 }
 
 export async function login(req: Request, res: Response) {

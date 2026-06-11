@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/error';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
 import {
   listCustomers,
   getCustomer,
@@ -15,8 +15,8 @@ router.use(authenticate);
 
 router.get('/', asyncHandler(listCustomers));
 router.get('/:id', asyncHandler(getCustomer));
-router.post('/', asyncHandler(createCustomer));
-router.put('/:id', asyncHandler(updateCustomer));
-router.delete('/:id', asyncHandler(deleteCustomer));
+router.post('/', authorize('OWNER'), asyncHandler(createCustomer));
+router.put('/:id', authorize('OWNER'), asyncHandler(updateCustomer));
+router.delete('/:id', authorize('OWNER'), asyncHandler(deleteCustomer));
 
 export default router;

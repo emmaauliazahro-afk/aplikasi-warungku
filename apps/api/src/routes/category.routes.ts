@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../middleware/error';
-import { authenticate } from '../middleware/auth';
+import { authenticate, authorize } from '../middleware/auth';
 import {
   listCategories,
   createCategory,
@@ -13,8 +13,8 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', asyncHandler(listCategories));
-router.post('/', asyncHandler(createCategory));
-router.put('/:id', asyncHandler(updateCategory));
-router.delete('/:id', asyncHandler(deleteCategory));
+router.post('/', authorize('OWNER'), asyncHandler(createCategory));
+router.put('/:id', authorize('OWNER'), asyncHandler(updateCategory));
+router.delete('/:id', authorize('OWNER'), asyncHandler(deleteCategory));
 
 export default router;
