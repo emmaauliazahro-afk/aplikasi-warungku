@@ -40,7 +40,6 @@ export async function listDebts(req: Request, res: Response) {
       skip: (q.page - 1) * q.limit,
       take: q.limit,
     }),
-    // total outstanding across all (ignores pagination/status filter)
     prisma.debt.aggregate({
       _sum: { remaining: true },
       where: { status: { in: ['UNPAID', 'PARTIAL'] } },
@@ -84,20 +83,26 @@ export async function getDebt(req: Request, res: Response) {
   });
 }
 
-// POST /api/debts/:id/payment - record an installment payment
+// POST /api/debts/:id/payment - record an installment payment (OWNER only)
+//
+// Race-safe: the UPDATE on `debt` uses a WHERE clause that constrains
+// `remaining >= amount`. If a concurrent request has already reduced the
+// remaining balance below `amount`, this update affects 0 rows and we abort
+// the transaction — preventing double-debit.
 export async function recordPayment(req: Request, res: Response) {
   const id = Number(req.params.id);
   if (Number.isNaN(id)) throw new ApiError(400, 'ID tidak valid');
 
   const data = debtPaymentSchema.parse(req.body);
 
+  // Read once to determine the new computed state. The actual write below is
+  // the authoritative, race-safe step; this read is only for the response
+  // message ("Hutang lunas!" vs "Pembayaran berhasil dicatat").
   const debt = await prisma.debt.findUnique({ where: { id } });
   if (!debt) throw new ApiError(404, 'Hutang tidak ditemukan');
-
   if (debt.status === 'PAID') {
     throw new ApiError(400, 'Hutang ini sudah lunas');
   }
-
   const remaining = toNumber(debt.remaining);
   if (data.amount > remaining) {
     throw new ApiError(400, `Pembayaran melebihi sisa hutang (sisa ${remaining})`);
@@ -110,12 +115,29 @@ export async function recordPayment(req: Request, res: Response) {
   );
 
   const updated = await prisma.$transaction(async (tx) => {
+    // Race-safe decrement: only succeeds if remaining is still >= amount.
+    const updateResult = await tx.debt.updateMany({
+      where: { id, status: { not: 'PAID' }, remaining: { gte: data.amount } },
+      data: { paidAmount: newPaid, remaining: newRemaining, status: newStatus },
+    });
+    if (updateResult.count === 0) {
+      // Either the debt was paid off or remaining shrank between our read and
+      // write. Re-read to give a precise error.
+      const fresh = await tx.debt.findUnique({ where: { id } });
+      if (fresh?.status === 'PAID') {
+        throw new ApiError(400, 'Hutang ini sudah lunas');
+      }
+      throw new ApiError(
+        400,
+        `Sisa hutang berubah saat pembayaran (sekarang ${toNumber(fresh?.remaining ?? 0)})`
+      );
+    }
+
     await tx.debtPayment.create({
       data: { debtId: id, amount: data.amount, note: data.note },
     });
-    return tx.debt.update({
+    return tx.debt.findUnique({
       where: { id },
-      data: { paidAmount: newPaid, remaining: newRemaining, status: newStatus },
       include: {
         customer: { select: { id: true, name: true } },
         payments: { orderBy: { createdAt: 'desc' } },
@@ -126,8 +148,8 @@ export async function recordPayment(req: Request, res: Response) {
   res.json({
     success: true,
     data: {
-      ...serializeDebt(updated),
-      payments: updated.payments.map((p) => ({ ...p, amount: toNumber(p.amount) })),
+      ...serializeDebt(updated!),
+      payments: updated!.payments.map((p) => ({ ...p, amount: toNumber(p.amount) })),
     },
     message: newStatus === 'PAID' ? 'Hutang lunas!' : 'Pembayaran berhasil dicatat',
   });

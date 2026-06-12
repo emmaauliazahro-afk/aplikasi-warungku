@@ -32,6 +32,44 @@ Monorepo dikelola dengan npm workspaces: `apps/web` (frontend) dan `apps/api` (b
 - Node.js 18+
 - Docker & Docker Compose (untuk PostgreSQL)
 - npm
+- Untuk konsistensi laporan harian, disarankan menjalankan shell dengan `TZ=Asia/Jakarta` (lihat section [⏰ Timezone](#-timezone)). Container PostgreSQL di `docker-compose.yml` juga sudah di-set `TZ=Asia/Jakarta`.
+
+## ⏰ Timezone
+
+Semua tanggal pada laporan penjualan, dashboard, dan pengelompokan transaksi harian dihitung dalam **timezone Asia/Jakarta (WIB)**. Hal ini diterapkan di backend melalui `apps/api/src/utils/date.ts` (fungsi `localDateKey`), yang memformat `Date` berdasarkan komponen **waktu lokal server** — bukan UTC.
+
+Di production (`docker-compose.prod.yml`), semua container sudah di-set `TZ=Asia/Jakarta` sehingga perilaku konsisten dengan kalender WIB.
+
+Untuk **deployment development lokal** (di laptop developer), default `TZ` adalah timezone host, yang bisa saja berbeda dari WIB. Jika tidak disesuaikan, transaksi yang dibuat di sekitar tengah malam UTC bisa jatuh ke "hari" yang salah di laporan. Untuk menghindari hal ini, ada dua opsi:
+
+**Opsi A — Set `TZ` di shell pengembangan** (lintas platform, paling sederhana):
+
+```bash
+export TZ=Asia/Jakarta
+npm run dev
+```
+
+Atau inline:
+
+```bash
+TZ=Asia/Jakarta npm run dev
+```
+
+**Opsi B — Set `TZ` pada container PostgreSQL** di `docker-compose.yml` agar waktu server Postgres konsisten dengan WIB:
+
+```yaml
+services:
+  postgres:
+    environment:
+      POSTGRES_USER: warung
+      POSTGRES_PASSWORD: warung123
+      POSTGRES_DB: warung_db
+      TZ: Asia/Jakarta
+```
+
+Disarankan mengombinasikan keduanya (shell + container) supaya tidak ada mismatch antara waktu Node.js backend dan PostgreSQL.
+
+> **Catatan multi-tenant trade-off:** saat ini sistem dirancang **single-tenant per deployment** (satu toko = satu instance). Karena logika "hari ini" mengikuti timezone server, multi-tenant dengan lokasi geografis berbeda dalam satu instance belum didukung dan akan membutuhkan refactor ke timezone per-tenant (penyimpanan `tz` di level user/store, dan penggunaan `Intl.DateTimeFormat`/library seperti `date-fns-tz`/`luxon` untuk konversi).
 
 ## ⚙️ Instalasi
 
@@ -136,9 +174,22 @@ aplikasi-warung/
 │       ├── components/       # Komponen UI
 │       ├── contexts/         # Auth & Toast context
 │       └── lib/              # API client per domain
-├── docker-compose.yml        # PostgreSQL
+├── docker-compose.yml        # PostgreSQL (TZ=Asia/Jakarta)
 └── package.json              # Workspace root
 ```
+
+### ⚠️ Catatan Multi-Tenant
+
+Repository ini adalah **single-tenant per deployment**: satu instance aplikasi = satu toko/warung. Semua data diasumsikan milik satu pemilik dengan satu timezone (WIB, lihat [⏰ Timezone](#-timezone)).
+
+Trade-off yang harus disadari sebelum menjadikan ini multi-tenant:
+
+- **Timezone per-tenant** — saat ini `localDateKey` menggunakan timezone server, sehingga beberapa tenant di zona berbeda akan melihat "hari ini" yang berbeda. Multi-tenant membutuhkan penyimpanan `tz` per store/user dan konversi tanggal sadar-timezone (mis. `date-fns-tz`, `luxon`).
+- **Autentikasi & role** — skema `User` mendukung peran Owner/Cashier, tetapi belum ada model `Store`/`Tenant`. Penambahan tenant management akan menyentuh skema Prisma, middleware auth, dan hampir semua controller.
+- **Laporan & dashboard** — agregasi harian (`groupBy hari`) saat ini dilakukan di level server; untuk multi-tenant, agregasi harus dipartisi per `tenantId`.
+- **Deployment** — setiap tenant idealnya tetap di-deploy terpisah agar isolasi data lebih kuat, kecuali memang dibutuhkan shared instance (yang berarti refactor besar).
+
+Untuk saat ini, jika Anda butuh beberapa warung sekaligus, pendekatan yang disarankan adalah **satu deployment per warung** (bisa di-host pada satu server dengan port berbeda).
 
 ## 🔌 Ringkasan API
 

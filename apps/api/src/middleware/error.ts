@@ -19,6 +19,22 @@ export function asyncHandler(
   };
 }
 
+// Minimal structured logger. We avoid pulling in pino/winston for now; this
+// emits a single JSON line per event so log shippers can parse it cheaply.
+// Replace with pino when the project gains a log aggregator.
+type LogLevel = 'info' | 'warn' | 'error';
+function log(level: LogLevel, event: string, fields: Record<string, unknown>) {
+  const line = JSON.stringify({
+    ts: new Date().toISOString(),
+    level,
+    event,
+    ...fields,
+  });
+  if (level === 'error') console.error(line);
+  else if (level === 'warn') console.warn(line);
+  else console.log(line);
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function errorHandler(
   err: Error,
@@ -26,7 +42,15 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ) {
+  const requestId = (req as { id?: string }).id;
+
   if (err instanceof ZodError) {
+    log('warn', 'validation_error', {
+      requestId,
+      path: req.originalUrl,
+      method: req.method,
+      issues: err.issues.map((i) => ({ path: i.path.join('.'), msg: i.message })),
+    });
     return res.status(400).json({
       success: false,
       message: 'Validasi gagal',
@@ -38,6 +62,15 @@ export function errorHandler(
   }
 
   if (err instanceof ApiError) {
+    if (err.statusCode >= 500) {
+      log('error', 'api_error', {
+        requestId,
+        path: req.originalUrl,
+        method: req.method,
+        status: err.statusCode,
+        message: err.message,
+      });
+    }
     return res.status(err.statusCode).json({
       success: false,
       message: err.message,
@@ -53,7 +86,14 @@ export function errorHandler(
     return res.status(400).json({ success: false, message });
   }
 
-  console.error('Unexpected error:', err);
+  log('error', 'unhandled_error', {
+    requestId,
+    path: req.originalUrl,
+    method: req.method,
+    name: err.name,
+    message: err.message,
+    stack: err.stack,
+  });
   return res.status(500).json({
     success: false,
     message: 'Terjadi kesalahan pada server',

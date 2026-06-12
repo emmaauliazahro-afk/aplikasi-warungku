@@ -17,10 +17,21 @@ const authLimiter = rateLimit({
   },
 });
 
+const meLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Terlalu banyak permintaan. Coba lagi nanti.',
+  },
+});
+
 router.post('/register', authLimiter, asyncHandler(register));
 router.post('/login', authLimiter, asyncHandler(login));
 router.post('/cashiers', authenticate, authorize('OWNER'), asyncHandler(createCashier));
 router.post('/logout', asyncHandler(logout));
-router.get('/me', authenticate, asyncHandler(me));
+router.get('/me', authenticate, meLimiter, asyncHandler(me));
 
 export default router;

@@ -1,13 +1,26 @@
 import { z } from 'zod';
 
 export const createProductSchema = z.object({
-  sku: z.string().trim().min(1).optional().nullable(),
-  name: z.string().trim().min(1, 'Nama produk wajib diisi'),
-  purchasePrice: z.coerce.number().min(0, 'Harga beli tidak boleh negatif').default(0),
-  sellingPrice: z.coerce.number().min(0, 'Harga jual tidak boleh negatif').default(0),
-  stock: z.coerce.number().int('Stok harus bilangan bulat').min(0, 'Stok tidak boleh negatif').default(0),
-  minStock: z.coerce.number().int().min(0).default(5),
-  unit: z.string().trim().min(1).default('pcs'),
+  sku: z.string().trim().min(1).max(50).optional().nullable(),
+  name: z.string().trim().min(1, 'Nama produk wajib diisi').max(150),
+  purchasePrice: z.coerce
+    .number()
+    .min(0, 'Harga beli tidak boleh negatif')
+    .max(1_000_000_000)
+    .default(0),
+  sellingPrice: z.coerce
+    .number()
+    .min(0, 'Harga jual tidak boleh negatif')
+    .max(1_000_000_000)
+    .default(0),
+  stock: z.coerce
+    .number()
+    .int('Stok harus bilangan bulat')
+    .min(0, 'Stok tidak boleh negatif')
+    .max(1_000_000)
+    .default(0),
+  minStock: z.coerce.number().int().min(0).max(1_000_000).default(5),
+  unit: z.string().trim().min(1).max(20).default('pcs'),
   categoryId: z.coerce.number().int().positive().optional().nullable(),
   isActive: z.boolean().optional(),
 });
@@ -18,7 +31,7 @@ export const updateProductSchema = createProductSchema.partial();
 export const listProductQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
-  search: z.string().trim().optional(),
+  search: z.string().trim().max(100).optional(),
   categoryId: z.coerce.number().int().positive().optional(),
   lowStock: z
     .enum(['true', 'false'])
@@ -34,8 +47,8 @@ export type UpdateProductInput = z.infer<typeof updateProductSchema>;
 // Stock adjustment: set absolute, or add/subtract a quantity
 export const adjustStockSchema = z.object({
   mode: z.enum(['SET', 'ADD', 'SUBTRACT']),
-  amount: z.coerce.number().int().min(0, 'Jumlah tidak boleh negatif'),
-  note: z.string().trim().optional(),
+  amount: z.coerce.number().int().min(0, 'Jumlah tidak boleh negatif').max(1_000_000),
+  note: z.string().trim().max(500).optional(),
 });
 
 export const movementQuerySchema = z.object({

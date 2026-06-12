@@ -2,23 +2,37 @@ import { Request, Response } from 'express';
 import prisma from '../lib/prisma';
 import { ApiError } from '../middleware/error';
 import { toNumber, serializeTransaction } from '../utils/serialize';
-import { createCustomerSchema, updateCustomerSchema } from '../schemas/customer.schema';
+import { parseIdParam } from '../utils/params';
+import {
+  createCustomerSchema,
+  listCustomerQuerySchema,
+  updateCustomerSchema,
+} from '../schemas/customer.schema';
 
 // GET /api/customers - list with optional search + total debt per customer
 export async function listCustomers(req: Request, res: Response) {
-  const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+  const q = listCustomerQuerySchema.parse(req.query);
 
-  const customers = await prisma.customer.findMany({
-    where: search ? { name: { contains: search, mode: 'insensitive' } } : undefined,
-    orderBy: { name: 'asc' },
-    include: {
-      debts: {
-        where: { status: { in: ['UNPAID', 'PARTIAL'] } },
-        select: { remaining: true },
+  const where = q.search
+    ? { name: { contains: q.search, mode: 'insensitive' as const } }
+    : undefined;
+
+  const [total, customers] = await Promise.all([
+    prisma.customer.count({ where }),
+    prisma.customer.findMany({
+      where,
+      orderBy: { name: 'asc' },
+      include: {
+        debts: {
+          where: { status: { in: ['UNPAID', 'PARTIAL'] } },
+          select: { remaining: true },
+        },
+        _count: { select: { transactions: true } },
       },
-      _count: { select: { transactions: true } },
-    },
-  });
+      skip: (q.page - 1) * q.limit,
+      take: q.limit,
+    }),
+  ]);
 
   const data = customers.map((c) => ({
     id: c.id,
@@ -30,13 +44,21 @@ export async function listCustomers(req: Request, res: Response) {
     transactionCount: c._count.transactions,
   }));
 
-  res.json({ success: true, data });
+  res.json({
+    success: true,
+    data,
+    meta: {
+      page: q.page,
+      limit: q.limit,
+      total,
+      totalPages: Math.ceil(total / q.limit),
+    },
+  });
 }
 
 // GET /api/customers/:id - detail with transaction history + outstanding debts
 export async function getCustomer(req: Request, res: Response) {
-  const id = Number(req.params.id);
-  if (Number.isNaN(id)) throw new ApiError(400, 'ID tidak valid');
+  const id = parseIdParam(req);
 
   const customer = await prisma.customer.findUnique({
     where: { id },
@@ -44,7 +66,12 @@ export async function getCustomer(req: Request, res: Response) {
       transactions: {
         orderBy: { createdAt: 'desc' },
         take: 20,
-        include: { _count: { select: { items: true } } },
+        include: {
+          items: true,
+          customer: true,
+          debt: true,
+          _count: { select: { items: true } },
+        },
       },
       debts: {
         orderBy: { createdAt: 'desc' },
@@ -93,8 +120,7 @@ export async function createCustomer(req: Request, res: Response) {
 
 // PUT /api/customers/:id
 export async function updateCustomer(req: Request, res: Response) {
-  const id = Number(req.params.id);
-  if (Number.isNaN(id)) throw new ApiError(400, 'ID tidak valid');
+  const id = parseIdParam(req);
 
   const data = updateCustomerSchema.parse(req.body);
   const existing = await prisma.customer.findUnique({ where: { id } });
@@ -113,8 +139,7 @@ export async function updateCustomer(req: Request, res: Response) {
 
 // DELETE /api/customers/:id
 export async function deleteCustomer(req: Request, res: Response) {
-  const id = Number(req.params.id);
-  if (Number.isNaN(id)) throw new ApiError(400, 'ID tidak valid');
+  const id = parseIdParam(req);
 
   const existing = await prisma.customer.findUnique({
     where: { id },

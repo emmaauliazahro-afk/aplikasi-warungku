@@ -14,17 +14,30 @@ import {
   computeDebtFields,
 } from '../utils/calc';
 
-// Generate TRX-YYYYMMDD-XXXX using a daily counter (within the tx for consistency)
+// --- Transaction number generation ---------------------------------------------
+// Use an atomic upsert on a single-row daily counter so concurrent transactions
+// cannot produce duplicate `transactionNumber`s. The unique index on
+// `Transaction.transactionNumber` is a final safety net; the counter prevents
+// relying on P2002 retries for correctness.
+const TX_NUMBER_RETRY_LIMIT = 5;
+
 async function generateTransactionNumber(
   tx: Prisma.TransactionClient
 ): Promise<string> {
   const now = new Date();
-  const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-  const prefix = `TRX-${datePart}`;
-  const count = await tx.transaction.count({
-    where: { transactionNumber: { startsWith: prefix } },
-  });
-  return formatTransactionNumber(now, count + 1);
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const key = `${y}${m}${d}`; // e.g. "20260612"
+
+  const rows = await tx.$queryRaw<{ seq: number }[]>`
+    INSERT INTO daily_counters (key, seq)
+    VALUES (${key}, 1)
+    ON CONFLICT (key) DO UPDATE SET seq = daily_counters.seq + 1
+    RETURNING seq
+  `;
+  const seq = rows[0]?.seq ?? 1;
+  return formatTransactionNumber(now, seq);
 }
 
 // POST /api/transactions
@@ -37,7 +50,32 @@ export async function createTransaction(req: Request, res: Response) {
     if (!customer) throw new ApiError(400, 'Pelanggan tidak ditemukan');
   }
 
-  const result = await prisma.$transaction(async (tx) => {
+  // Retry the whole tx a few times on P2002 (transaction number race fallback)
+  let lastError: unknown;
+  for (let attempt = 0; attempt < TX_NUMBER_RETRY_LIMIT; attempt++) {
+    try {
+      const result = await runCreateTransaction(req, data);
+      res.status(201).json({ success: true, data: serializeTransaction(result) });
+      return;
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        lastError = err;
+        continue; // retry
+      }
+      throw err;
+    }
+  }
+  throw lastError ?? new ApiError(500, 'Gagal membuat nomor transaksi');
+}
+
+async function runCreateTransaction(
+  req: Request,
+  data: ReturnType<typeof createTransactionSchema.parse>
+) {
+  return prisma.$transaction(async (tx) => {
     // Load all products involved
     const productIds = data.items.map((i) => i.productId);
     const products = await tx.product.findMany({ where: { id: { in: productIds } } });
@@ -94,7 +132,6 @@ export async function createTransaction(req: Request, res: Response) {
     } else if (data.paymentMethod === 'TRANSFER') {
       paidAmount = totalAmount; // assume exact transfer
     } else if (data.paymentMethod === 'DEBT') {
-      // partial down payment allowed; remaining becomes debt
       if (paidAmount > totalAmount) {
         throw new ApiError(400, 'Uang muka tidak boleh melebihi total');
       }
@@ -120,11 +157,25 @@ export async function createTransaction(req: Request, res: Response) {
       },
     });
 
-    // Deduct stock + record SALE movements
+    // Deduct stock + record SALE movements atomically per item.
+    // The WHERE clause `stock: { gte: qty }` makes the decrement race-safe:
+    // if a concurrent request already reduced stock below qty, the update
+    // affects 0 rows and we throw, aborting the whole transaction.
     for (const su of stockUpdates) {
-      await tx.product.update({
+      const updateResult = await tx.product.updateMany({
+        where: { id: su.id, stock: { gte: su.qty } },
+        data: { stock: { decrement: su.qty } },
+      });
+      if (updateResult.count === 0) {
+        throw new ApiError(
+          400,
+          `Stok produk ID ${su.id} berubah saat transaksi (stok tidak cukup)`
+        );
+      }
+      // Re-read to get the authoritative stockAfter
+      const fresh = await tx.product.findUnique({
         where: { id: su.id },
-        data: { stock: su.after },
+        select: { stock: true },
       });
       await tx.stockMovement.create({
         data: {
@@ -132,7 +183,7 @@ export async function createTransaction(req: Request, res: Response) {
           type: 'SALE',
           quantity: -su.qty,
           stockBefore: su.before,
-          stockAfter: su.after,
+          stockAfter: fresh?.stock ?? su.after,
           note: `Penjualan ${transactionNumber}`,
           referenceId: created.id,
         },
@@ -165,8 +216,6 @@ export async function createTransaction(req: Request, res: Response) {
       },
     });
   });
-
-  res.status(201).json({ success: true, data: serializeTransaction(result) });
 }
 
 // GET /api/transactions
@@ -193,7 +242,12 @@ export async function listTransactions(req: Request, res: Response) {
     prisma.transaction.count({ where }),
     prisma.transaction.findMany({
       where,
-      include: { customer: true, _count: { select: { items: true } } },
+      include: {
+        items: true,
+        customer: true,
+        debt: true,
+        _count: { select: { items: true } },
+      },
       orderBy: { createdAt: 'desc' },
       skip: (q.page - 1) * q.limit,
       take: q.limit,
