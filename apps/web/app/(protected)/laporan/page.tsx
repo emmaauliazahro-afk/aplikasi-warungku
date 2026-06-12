@@ -88,7 +88,7 @@ function SalesTab({ params }: { params: ReportParams }) {
 
   useEffect(() => { fetch_(); }, [fetch_]);
 
-  const shortDate = (iso: string) => new Date(iso).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+  const shortDate = (iso: any) => new Date(String(iso)).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 
   if (loading) return <Spinner />;
   if (!data) return <p className="py-8 text-center text-on-surface-variant">Gagal memuat data</p>;
