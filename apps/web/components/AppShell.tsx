@@ -12,7 +12,8 @@ type IconName =
   | 'stok'
   | 'pelanggan'
   | 'hutang'
-  | 'laporan';
+  | 'laporan'
+  | 'setting';
 
 function NavIcon({ name, className = 'h-5 w-5' }: { name: IconName; className?: string }) {
   const common = {
@@ -53,6 +54,10 @@ function NavIcon({ name, className = 'h-5 w-5' }: { name: IconName; className?: 
       return (
         <svg {...common}><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>
       );
+    case 'setting':
+      return (
+        <svg {...common}><circle cx="12" cy="12" r="3" /><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" /></svg>
+      );
   }
 }
 
@@ -64,6 +69,7 @@ const NAV_ITEMS: { href: string; label: string; icon: IconName }[] = [
   { href: '/pelanggan', label: 'Pelanggan', icon: 'pelanggan' },
   { href: '/hutang', label: 'Hutang', icon: 'hutang' },
   { href: '/laporan', label: 'Laporan', icon: 'laporan' },
+  { href: '/setting', label: 'Setting', icon: 'setting' },
 ];
 
 function initials(name?: string) {

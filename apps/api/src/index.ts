@@ -20,6 +20,7 @@ import transactionRoutes from './routes/transaction.routes';
 import customerRoutes from './routes/customer.routes';
 import debtRoutes from './routes/debt.routes';
 import reportRoutes from './routes/report.routes';
+import settingsRoutes from './routes/settings.routes';
 
 const app: Application = express();
 
@@ -84,6 +85,7 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/debts', debtRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // 404 + error handling (must be last)
 app.use(notFoundHandler);
