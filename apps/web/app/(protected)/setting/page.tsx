@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createCashier, getSettings, updateSettings } from '@/lib/settings';
+import { createCashier, getSettings, listCashiers, updateSettings, type OwnerInfo } from '@/lib/settings';
 import Spinner from '@/components/Spinner';
 import { useToast } from '@/contexts/ToastContext';
 import { ApiError } from '@/lib/api';
@@ -18,13 +18,15 @@ export default function SettingPage() {
   const [cashierName, setCashierName] = useState('');
   const [cashierEmail, setCashierEmail] = useState('');
   const [cashierPassword, setCashierPassword] = useState('');
+  const [cashiers, setCashiers] = useState<OwnerInfo[]>([]);
 
   useEffect(() => {
-    getSettings()
-      .then(({ settings }) => {
+    Promise.all([getSettings(), listCashiers()])
+      .then(([{ settings }, { cashiers }]) => {
         setStoreName(settings.storeName);
         setOwnerName(settings.owner.name);
         setOwnerEmail(settings.owner.email);
+        setCashiers(cashiers);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Gagal memuat setting'))
       .finally(() => setLoading(false));
@@ -49,7 +51,8 @@ export default function SettingPage() {
     setError('');
     setAdding(true);
     try {
-      await createCashier({ name: cashierName, email: cashierEmail, password: cashierPassword });
+      const { user } = await createCashier({ name: cashierName, email: cashierEmail, password: cashierPassword });
+      setCashiers((prev) => [user, ...prev]);
       setCashierName('');
       setCashierEmail('');
       setCashierPassword('');
@@ -77,13 +80,39 @@ export default function SettingPage() {
         <div><label className="label-caps mb-2 block">Email Owner</label><input className="input" type="email" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} required /></div>
         <button className="btn btn-primary" disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan Setting'}</button>
       </form>
-      <form onSubmit={onAddCashier} className="card space-y-4 p-6">
-        <h2 className="text-xl font-semibold text-on-surface">Tambah Kasir</h2>
-        <div><label className="label-caps mb-2 block">Nama Kasir</label><input className="input" value={cashierName} onChange={(e) => setCashierName(e.target.value)} required minLength={2} /></div>
-        <div><label className="label-caps mb-2 block">Email Kasir</label><input className="input" type="email" value={cashierEmail} onChange={(e) => setCashierEmail(e.target.value)} required /></div>
-        <div><label className="label-caps mb-2 block">Password</label><input className="input" type="password" value={cashierPassword} onChange={(e) => setCashierPassword(e.target.value)} required minLength={8} /><p className="mt-1 text-xs text-on-surface-variant">Minimal 8 karakter, mengandung huruf dan angka.</p></div>
-        <button className="btn btn-secondary" disabled={adding}>{adding ? 'Menambahkan...' : 'Tambah Kasir'}</button>
-      </form>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <form onSubmit={onAddCashier} className="card space-y-4 p-6">
+          <h2 className="text-xl font-semibold text-on-surface">Tambah Kasir</h2>
+          <div><label className="label-caps mb-2 block">Nama Kasir</label><input className="input" value={cashierName} onChange={(e) => setCashierName(e.target.value)} required minLength={2} /></div>
+          <div><label className="label-caps mb-2 block">Email Kasir</label><input className="input" type="email" value={cashierEmail} onChange={(e) => setCashierEmail(e.target.value)} required /></div>
+          <div><label className="label-caps mb-2 block">Password</label><input className="input" type="password" value={cashierPassword} onChange={(e) => setCashierPassword(e.target.value)} required minLength={8} /><p className="mt-1 text-xs text-on-surface-variant">Minimal 8 karakter, mengandung huruf dan angka.</p></div>
+          <button className="btn btn-secondary" disabled={adding}>{adding ? 'Menambahkan...' : 'Tambah Kasir'}</button>
+        </form>
+
+        <section className="card p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-on-surface">Daftar Kasir</h2>
+            <span className="rounded-full bg-surface-container px-3 py-1 text-xs font-semibold text-on-surface-variant">{cashiers.length} akun</span>
+          </div>
+          {cashiers.length === 0 ? (
+            <p className="rounded-xl bg-surface-container-low p-4 text-sm text-on-surface-variant">Belum ada akun kasir.</p>
+          ) : (
+            <div className="divide-y divide-outline-variant">
+              {cashiers.map((cashier) => (
+                <div key={cashier.id} className="flex items-center gap-3 py-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-fixed text-sm font-bold text-primary">
+                    {cashier.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-semibold text-on-surface">{cashier.name}</div>
+                    <div className="truncate text-sm text-on-surface-variant">{cashier.email}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

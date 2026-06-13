@@ -36,3 +36,13 @@ export async function createCashierFromSettings(req: Request, res: Response) {
   const user = await prisma.user.create({ data: { name: data.name, email: data.email, password: await hashPassword(data.password), role: 'CASHIER' }, select: { id: true, name: true, email: true, role: true, createdAt: true } });
   res.status(201).json({ success: true, data: { user } });
 }
+
+
+export async function listCashiers(_req: Request, res: Response) {
+  const cashiers = await prisma.user.findMany({
+    where: { role: 'CASHIER' },
+    select: { id: true, name: true, email: true, role: true, createdAt: true },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json({ success: true, data: { cashiers } });
+}

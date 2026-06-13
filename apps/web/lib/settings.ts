@@ -28,6 +28,10 @@ export function updateSettings(data: { storeName: string; ownerName: string; own
   });
 }
 
+export function listCashiers() {
+  return apiFetch<{ cashiers: OwnerInfo[] }>('/settings/cashiers');
+}
+
 export function createCashier(data: { name: string; email: string; password: string }) {
   return apiFetch<{ user: OwnerInfo }>('/settings/cashiers', {
     method: 'POST',
