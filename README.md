@@ -269,6 +269,19 @@ Akun default: `owner@warung.test` / `password123` — **segera ganti password** 
 - `NEXT_PUBLIC_API_URL` di-_inline_ saat build image web. Jika URL berubah, rebuild image web (`--build`).
 - Data PostgreSQL disimpan di volume `postgres_prod_data` agar persisten antar restart.
 
+## 🚀 Deployment Web di Vercel + API Terpisah
+
+Vercel tidak otomatis menjalankan server Express dari `apps/api/src/index.ts` sebagai proses Node.js long-running. Jika frontend `apps/web` dideploy ke Vercel, backend API tetap harus tersedia di URL publik HTTPS, misalnya VPS/Docker, Railway, Render, Fly.io, atau layanan Node.js lain.
+
+Konfigurasi yang wajib disesuaikan:
+
+- Di Vercel project frontend, set `NEXT_PUBLIC_API_URL=https://domain-api-anda.com/api`, lalu redeploy karena nilai ini di-inline saat build.
+- Di environment backend API, set `WEB_ORIGIN=https://domain-web-anda.vercel.app`. Untuk production dan preview domain, pisahkan dengan koma, misalnya `https://app.vercel.app,https://app-git-main-user.vercel.app`.
+- Jika web dan API berada di domain HTTPS berbeda, set `COOKIE_SAME_SITE=none` di backend agar cookie login bisa dikirim oleh browser pada request lintas domain.
+- Pastikan endpoint `https://domain-api-anda.com/api/health` mengembalikan status API sebelum mengetes login dari frontend.
+
+Jika `NEXT_PUBLIC_API_URL` tidak diset saat build production, frontend akan memakai path relatif `/api`. Itu hanya cocok bila Anda memang menyediakan API pada domain yang sama lewat rewrite/proxy atau serverless route.
+
 ## 🤝 Contributing
 
 Kontribusi sangat diterima! Silakan buat issue atau pull request.

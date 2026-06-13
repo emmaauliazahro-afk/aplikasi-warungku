@@ -16,18 +16,27 @@ const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 const DUMMY_HASH =
   '$2a$10$CwTycUXWue0Thq9StjUM0uJ8pP3E5HQJ1y7I1sF4V3o6K5sH0eN9yG';
 
-function setAuthCookie(res: Response, token: string) {
+function isHttpsRequest(req: Request): boolean {
+  return req.secure || req.headers['x-forwarded-proto'] === 'https';
+}
+
+function setAuthCookie(req: Request, res: Response, token: string) {
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: env.isProduction,
-    sameSite: 'lax',
+    secure: env.isProduction || isHttpsRequest(req),
+    sameSite: env.cookieSameSite,
     maxAge: COOKIE_MAX_AGE,
     path: '/',
   });
 }
 
-function clearAuthCookie(res: Response) {
-  res.clearCookie(COOKIE_NAME, { path: '/' });
+function clearAuthCookie(req: Request, res: Response) {
+  res.clearCookie(COOKIE_NAME, {
+    httpOnly: true,
+    secure: env.isProduction || isHttpsRequest(req),
+    sameSite: env.cookieSameSite,
+    path: '/',
+  });
 }
 
 function publicUser(u: { id: number; name: string; email: string; role: string; createdAt?: Date }) {
@@ -83,7 +92,7 @@ export async function register(req: Request, res: Response) {
   });
 
   const token = signToken({ userId: user.id, email: user.email, role: user.role });
-  setAuthCookie(res, token);
+  setAuthCookie(req, res, token);
 
   // The token is also returned in the body for SPA convenience, but is no
   // longer required — the httpOnly cookie is the authoritative credential.
@@ -135,7 +144,7 @@ export async function login(req: Request, res: Response) {
   }
 
   const token = signToken({ userId: user.id, email: user.email, role: user.role });
-  setAuthCookie(res, token);
+  setAuthCookie(req, res, token);
 
   res.json({
     success: true,
@@ -164,7 +173,7 @@ export async function me(req: Request, res: Response) {
 // Clears the cookie. JWT remains valid until expiry — see TODO in README for
 // token-invalidation via a `tokenVersion` column.
 export async function logout(_req: Request, res: Response) {
-  clearAuthCookie(res);
+  clearAuthCookie(_req, res);
   res.json({ success: true, message: 'Berhasil logout' });
 }
 

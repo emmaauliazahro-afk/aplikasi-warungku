@@ -1,0 +1,5 @@
+{
+  "version": 2,
+  "buildCommand": "pnpm install && pnpm exec prisma generate && pnpm run build",
+  "installCommand": "pnpm install --no-frozen-lockfile"
+}

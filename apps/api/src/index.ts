@@ -25,7 +25,7 @@ const app: Application = express();
 
 // Trust the first proxy when behind a reverse proxy (nginx, compose) so that
 // `req.ip` and the rate-limiter's IP key reflect the real client.
-if (env.isProduction) {
+if (env.isProduction || env.webOrigins.some((origin) => origin.startsWith('https://'))) {
   app.set('trust proxy', 1);
 }
 
@@ -50,8 +50,9 @@ app.use(
 );
 app.use(
   cors({
-    origin: env.webOrigin,
+    origin: env.webOrigins,
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
 app.use(globalLimiter);
@@ -88,9 +89,13 @@ app.use('/api/reports', reportRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-app.listen(env.port, () => {
-  // eslint-disable-next-line no-console
-  console.log(`✅ Server running on port ${env.port}`);
-});
+// Only start server when running locally (not on Vercel)
+if (process.env.VERCEL !== '1') {
+  app.listen(env.port, () => {
+    // eslint-disable-next-line no-console
+    console.log(`✅ Server running on port ${env.port}`);
+  });
+}
 
+// Export for Vercel serverless
 export default app;

@@ -23,7 +23,7 @@ export function originCheck(req: Request, _res: Response, next: NextFunction) {
   if (!origin) {
     return next();
   }
-  if (origin !== env.webOrigin) {
+  if (!env.webOrigins.includes(origin)) {
     throw new ApiError(403, 'Origin tidak diizinkan.');
   }
   next();
